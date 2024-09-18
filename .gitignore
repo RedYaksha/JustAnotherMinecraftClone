@@ -5,7 +5,8 @@
 Build/
 **/imgui.ini
 imgui.ini
-**/CMakeCache.txt
+CMakeCache.txt
+cmake_install.txt
 *.xcodeproj
 CMakeFiles/
 CMakeScripts/
