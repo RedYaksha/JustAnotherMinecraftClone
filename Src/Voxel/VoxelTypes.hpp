@@ -10,6 +10,7 @@
 #include "Gameplay/Physics/PhysicsCoreTypes.hpp"
 #include "EngineInterface.hpp"
 #include "Core/Drawables.hpp"
+#include "simd/simd.h"
 
 struct Int3D {
     typedef int IndexType;
@@ -59,11 +60,11 @@ public:
     }
     
     simd::int3 to_int3() const {
-        return make_int3(x, y, z);
+        return simd::make_int3(x, y, z);
     }
     
     simd::float3 to_float3() const {
-        return make_float3(x,y,z);
+        return simd::make_float3(x,y,z);
     }
     
     std::array<Int3D, 4> getNeighbors() const {
@@ -264,8 +265,8 @@ public:
     Int3D getPosition() const { return position; }
     Int3D getIndex() const { return index; }
     
-    simd::float3 getPositionAsFloat3() const { return make_float3(position.x, position.y, position.z); }
-    simd::float4 getPositionAsFloat4() const { return make_float4(position.x, position.y, position.z, 0.0f);}
+    simd::float3 getPositionAsFloat3() const { return simd::make_float3(position.x, position.y, position.z); }
+    simd::float4 getPositionAsFloat4() const { return simd::make_float4(position.x, position.y, position.z, 0.0f);}
     const std::map<Int3D, simd::float3>& getVoxelLightColorMap() const { return voxelLightColor; }
     const std::vector<CollisionRect*>& getCollisionRects() const { return collisionRects; }
 

@@ -16,6 +16,7 @@ set( SOURCE_FILES
 	WorldGeneration/PerlinNoiseGenerator.cpp	
 	Engine.mm
 	main.mm
+	Core/ChunkRenderer.cpp
 
 	${THIRD_PARTY_DIR}/Apple/AAPLMathUtilities.cpp
 	${THIRD_PARTY_DIR}/stb/stbi_image.cpp

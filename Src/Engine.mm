@@ -7,8 +7,6 @@
 
 #import "Engine.hpp"
 #include <mutex>
-#include "Foundation/NSString.hpp"
-#include <Foundation/Foundation.h>
 #import <iostream>
 #include <format>
 #import <chrono>
@@ -40,56 +38,8 @@ const int MTLEngine::loadDistance = 16;
 const int MTLEngine::renderDistance = 10;
 const Int3D MTLEngine::chunkDims = {16,32,16};
 
-std::map<Int3D, ChunkRenderData> ChunkRenderer::cachedChunkBuffers = std::map<Int3D, ChunkRenderData>();
-std::map<Int3D, ChunkRenderData> ChunkRenderer::cachedTransparentChunkBuffers = std::map<Int3D, ChunkRenderData>();
-
-
-void ChunkRenderer::render(const Chunk& chunk, MTL::RenderCommandEncoder* renderCommandEncoder, MTL::Device* metalDevice, int index) {
-    if(!vertexBuffer || dirty) {
-        Int3D chunkIndex = chunk.getIndex();
-        
-        if(cachedChunkBuffers.contains(chunkIndex)) {
-            ChunkRenderData rd = cachedChunkBuffers[chunkIndex];
-            vertexBuffer = rd.buffer;
-            numVertices = rd.numVertices;
-            dirty = false;
-        }
-    }
-    
-    renderCommandEncoder->setVertexBuffer(vertexBuffer, 0, 0);
-    
-    
-    MTL::PrimitiveType typeTriangle = MTL::PrimitiveTypeTriangle;
-    NS::UInteger vertexStart = 0;
-    NS::UInteger vertexCount = numVertices;
-    renderCommandEncoder->drawPrimitives(typeTriangle, vertexStart, vertexCount);
-}
-
-void ChunkRenderer::renderTransparent(const Chunk& chunk, MTL::RenderCommandEncoder* renderCommandEncoder) {
-    if(transparentDirty || !transparentRenderData.buffer) {
-        Int3D chunkIndex = chunk.getIndex();
-        
-        if(cachedTransparentChunkBuffers.contains(chunkIndex)) {
-            transparentRenderData = cachedTransparentChunkBuffers[chunkIndex];
-            transparentDirty = false;
-        }
-    }
-    
-    if(transparentDirty || !transparentRenderData.buffer || transparentRenderData.numVertices == 0) {
-        return;
-    }
-    
-    renderCommandEncoder->setVertexBuffer(transparentRenderData.buffer, 0, 0);
-
-    MTL::PrimitiveType typeTriangle = MTL::PrimitiveTypeTriangle;
-    NS::UInteger vertexStart = 0;
-    NS::UInteger vertexCount = transparentRenderData.numVertices;
-    renderCommandEncoder->drawPrimitives(typeTriangle, vertexStart, vertexCount);
-}
 
 void MTLEngine::init() {
-
-    
     //  - generate PerlinGenerator per chunk, radiating from origin chunk (Breadth-first search) (single-thread)
     //      - during gameplay, re-create this thread if there's a good reason to (e.g. player moves chunks)
     //  - add chunk to queue denoting it is ready for vertex buffer generation (can be spread out over X threads)

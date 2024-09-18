@@ -1,9 +1,3 @@
-//
-//  mtl_engine.hpp
-//  MetalTutorial
-//
-//  Created by Ronnin Padilla on 7/19/24.
-//
 #pragma once
 
 #define GLFW_INCLUDE_NONE
@@ -17,6 +11,9 @@
 #include <QuartzCore/CAMetalLayer.hpp>
 #include <QuartzCore/CAMetalLayer.h>
 #include <QuartzCore/QuartzCore.hpp>
+#include "Foundation/NSString.hpp"
+#include <Foundation/Foundation.h>
+
 #include <simd/simd.h>
 
 #include <stb/stb_image.h>
@@ -42,6 +39,7 @@
 #include "Core/Mesh/AssimpNodeManager.hpp"
 #include "Core/Mesh/Animator.hpp"
 #include "Core/CoreTypes.hpp"
+#include "Core/ChunkRenderer.hpp"
 
 #include "EngineInterface.hpp"
 #include "Core/Drawables.hpp"
@@ -61,34 +59,6 @@ static std::map<EVoxelType, VoxelAtlasEntry> voxelTypeAtlasIndexMap = {
 };
 
 
-struct ChunkRenderData {
-    MTL::Buffer* buffer;
-    int numVertices;
-};
-
-class ChunkRenderer {
-    
-public:
-    static std::map<Int3D, ChunkRenderData> cachedChunkBuffers;
-    static std::map<Int3D, ChunkRenderData> cachedTransparentChunkBuffers;
-    
-    ChunkRenderer(): vertexBuffer(nullptr), dirty(true), numVertices(-1) {}
-    
-    void render(const Chunk& chunk, MTL::RenderCommandEncoder* renderCommandEncoder, MTL::Device* metalDevice, int index);
-    void renderTransparent(const Chunk& chunk, MTL::RenderCommandEncoder* renderCommandEncoder);
-    void markDirty() {
-        dirty = true;
-        transparentDirty = true;
-    }
-    bool isDirty() const { return dirty; }
-    
-private:
-    MTL::Buffer* vertexBuffer;
-    ChunkRenderData transparentRenderData;
-    bool dirty;
-    bool transparentDirty;
-    int numVertices;
-};
 
 struct ShadowLayerInfo {
     int resolution;
