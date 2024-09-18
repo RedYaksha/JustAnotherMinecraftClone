@@ -13,7 +13,7 @@ using namespace simd;
 
 Player::Player(IEngine* engine, MTL::Device* device)
 : engine(engine) {
-    nodeManager = AssimpNodeManager("assets/Meshes/Steve/Steve.fbx");
+    nodeManager = AssimpNodeManager("assets/Meshes/Steve/Steve.fbx", 1.0f);
     animator = Animator(&nodeManager);
     animator.setAnimationOrder({
         "Armature|Walk",
@@ -33,6 +33,7 @@ Player::Player(IEngine* engine, MTL::Device* device)
         assert(mu.positions.size() == mu.uvs.size());
         
         for(int i = 0; i < (int) mu.positions.size(); i++) {
+
             SkeletalMeshVertexData v;
             v.position = mu.positions[i];
             v.normal = mu.normals[i];
@@ -146,6 +147,7 @@ void Player::tick(float deltaTime, const std::array<bool, 104>& keyDownArr) {
 
         if(boneId >= 0) {
             boneTransforms[boneId] = mt * bones[boneId].offsetMat;
+            // boneTransforms[boneId] = bones[boneId].offsetMat;
         }
     }
     

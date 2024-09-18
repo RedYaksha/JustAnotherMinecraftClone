@@ -9,6 +9,9 @@
 #include "assimp/Importer.hpp"
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <simd/matrix.h>
+#include <simd/quaternion.h>
+#import "AAPLMathUtilities.h"
 
 #include <iostream>
 #include <queue>
@@ -29,6 +32,9 @@ void AssimpNodeManager::init() {
     
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(filePath, aiProcess_Triangulate | aiProcess_FlipUVs);
+
+    std::cout << "Assimp loading: " << filePath << std::endl;
+    
     
     if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
     {
@@ -86,6 +92,7 @@ void AssimpNodeManager::init() {
             0.0f, 0.0f, 0.0f, 1.0f);
 
         scene->mRootNode->mTransformation = mat;
+	
         
         axisFixMat = mat;
     }
@@ -265,6 +272,7 @@ void AssimpNodeManager::initAnimations(const aiScene *scene) {
         
         
         animations.push_back(newAnim);
+	std::cout << "Adding animation: " << newAnim.name << std::endl;
     }
 }
 
@@ -291,6 +299,47 @@ float4x4 AssimpNodeManager::convertAssimpMatrix(aiMatrix4x4 m) {
         {m.a1, m.c1, m.b1, m.d1},
         {m.a2, m.c2, m.b2, m.d2},
         {m.a3, m.c3, m.b3, m.d3},
+        {m.a4, m.c4, m.b4, m.d4}
+    }};
+    */
+    
+    
+    /*
+    float4x4 to = (matrix_float4x4) {{
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {m.a4, m.b4, m.c4, 1}
+    }};
+    */
+    
+    
+    return to;
+}
+
+float4x4 AssimpNodeManager::convertAssimpMatrix2(aiMatrix4x4 m) {
+    
+    /*
+    float4x4 to = (matrix_float4x4) {{
+        {m.a1, m.a2, m.a3, m.a4},
+        {m.b1, m.b2, m.b3, m.b4},
+        {m.c1, m.c2, m.c3, m.c4},
+        {m.d1, m.d2, m.d3, m.d4}
+    }};
+    */
+    
+    float4x4 to = (matrix_float4x4) {{
+        {m.a1, m.b1, m.c1, m.d1},
+        {m.a2, m.b2, m.c2, m.d2},
+        {m.a3, m.b3, m.c3, m.d3},
+        {m.a4, m.b4, m.c4, m.d4}
+    }};
+    
+    /*
+    float4x4 to = (matrix_float4x4) {{
+        {m.a1, m.c1, -m.b1, m.d1},
+        {m.a2, m.c2, -m.b2, m.d2},
+        {m.a3, m.c3, -m.b3, m.d3},
         {m.a4, m.c4, m.b4, m.d4}
     }};
     */
@@ -360,6 +409,15 @@ void AssimpNodeManager::ensureBoneRegistered(const aiBone *bone) {
     Bone newBone;
     newBone.name = boneName;
     newBone.id = (int) bones.size();
+
+    
+    /*
+    auto off = matrix4x4_rotation(3.14 / 2, make_float3(1,0,0)) ;
+    auto offsetMat = convertAssimpMatrix(bone->mOffsetMatrix);
+    auto fixMat = convertAssimpMatrix(axisFixMat);
+    //newBone.offsetMat = simd::inverse(fixMat * simd::inverse(offsetMat));
+    */
+
     newBone.offsetMat = convertAssimpMatrix(axisFixMat * bone->mOffsetMatrix);
     
     boneNameToId[boneName] = newBone.id;

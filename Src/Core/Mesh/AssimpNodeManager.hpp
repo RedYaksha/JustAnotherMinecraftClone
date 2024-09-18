@@ -96,6 +96,7 @@ public:
     
     // void releaseIntermediateData();
     static simd::float4x4 convertAssimpMatrix(aiMatrix4x4 mat);
+    static simd::float4x4 convertAssimpMatrix2(aiMatrix4x4 mat);
     static simd::float3 convertAssimpVector3(aiVector3D v);
     static simd::quatf convertAssimpQuat3(aiQuaternion q);
     
