@@ -3,14 +3,15 @@ This is just another minecraft clone because the world clearly needed another on
 
 **NOTE: Currently the only supported graphics API is Metal, so this project will only compile/work on macOS. OpenGL support is planned.**
 
-
+![Example screenshot](Resources/example-screenshot-1.png)
 ## Features
 In this project you can find:
 - Deferred Shading
+- Screen-space ambient occlusion (SSAO)
+- Cascaded Shadow Maps
 - Transparent Blocks
 - Light-source (point-light) blocks
 - Bloom
-- Cascaded Shadow Maps
 - Skybox
 - Multi-threaded chunk generation/meshing
 - Animated Skeletal Meshes
