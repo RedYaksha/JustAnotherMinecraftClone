@@ -1,0 +1,11 @@
+.idea/
+.cache/
+.cmake/
+**/*.DS_Store
+Build/
+**/imgui.ini
+imgui.ini
+**/CMakeCache.txt
+*.xcodeproj
+CMakeFiles/
+CMakeScripts/
