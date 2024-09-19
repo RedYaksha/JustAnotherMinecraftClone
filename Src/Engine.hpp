@@ -58,8 +58,6 @@ static std::map<EVoxelType, VoxelAtlasEntry> voxelTypeAtlasIndexMap = {
     {EVoxelType::Lamp, VoxelAtlasEntry(g_atlasNumCol * 2 + 0)}
 };
 
-
-
 struct ShadowLayerInfo {
     int resolution;
     float camAlpha; // value [0,1] denoting distance from main camera's near to far
@@ -111,6 +109,8 @@ private:
     void createSphere();
     
     void initCameras();
+
+    // chunk generation/mesh
     void initChunkGeneration();
     void initiatePerlinGeneration();
     void resolveChunkGeneration();
@@ -119,9 +119,9 @@ private:
     void generateChunk(Int3D chunkIndex);
     void tryMeshChunk();
     void meshChunk(Int3D chunkIndex);
-    
     void initChunkRenderers();
     
+    // init
     void initCascadingShadowMaps();
     void initSSAO();
     void initSkybox();
@@ -130,12 +130,6 @@ private:
     void initPostProcessPass();
     void initMeshRenderPass();
     void initLinePass();
-    
-    void initPlayerMesh();
-    
-    void processAssimpAnimations(const aiNode* node, const aiScene* scene);
-    void processAssimpNode(const aiNode* node, const aiScene* scene);
-    void processAssimpMesh(const aiMesh* mesh, const aiScene* scene);
     
     void createBuffers();
     void createDepthAndMSAATextures();
@@ -182,7 +176,6 @@ private:
         EKey turnDown;
     };
     
-    void cameraTick(const float deltaTime, Camera& outCamera, const CameraMovementKeyMap keyMap);
     void tickPlayerCameraThirdPerson(const float deltaTime, Camera& outCamera);
     void tickPlayerCameraFirstPerson(const float deltaTime, Camera& outCamera);
     
@@ -190,6 +183,7 @@ private:
     void mouseTick(const float deltaTime);
     void engineTick(const float deltaTime);
     void physicsTick(const float deltaTime);
+    void freeFloatingCameraTick(const float deltaTime, Camera& outCamera, const CameraMovementKeyMap keyMap);
     
     void bindShadowMapFrustumWithMainCamera(float zAlphaStart, float zAlphaEnd, Camera& shadowCam);
     
@@ -208,7 +202,12 @@ private:
     void handleKeyInput(int key, int scancode, int action, int mods);
     void handleMousePos(double xpos, double ypos);
     // ~end engine callbacks
+    //
+    bool isKeyDown(const EKey k) const { return keydownArr[k]; }
 
+    void addPointLight(float3 posWS, float3 color);
+
+private:
     MTL::Device* metalDevice;
     GLFWwindow* glfwWindow;
     NSWindow* metalWindow;
@@ -218,40 +217,25 @@ private:
     MTL::Library* metalDefaultLibrary;
     MTL::CommandQueue* metalCommandQueue;
     MTL::CommandBuffer* metalCommandBuffer;
-    MTL::RenderPipelineState* metalRenderPSO;
-    MTL::Buffer* triangleVertexBuffer;
-    MTL::Buffer* squareVertexBuffer;
     
-    MTL::Buffer* cubeVB;
-    
-    
-    
-    
-    //MTL::Buffer* transformationUB;
-    //MTL::Buffer* debugTransformationUB;
-    //MTL::Buffer* lightTransformationUB;
-    
-    MTL::Buffer* cameraUB;
-    MTL::Buffer* chunkVB;
-    std::vector<VertexData> chunkVertices;
-    
+    //
     Texture* atlasTexture;
     
-    MTL::DepthStencilState* depthStencilState;
-    
-    MTL::RenderPassDescriptor* renderPassDescriptor;
+    // 
+    // imgui
+    //
     MTL::RenderPassDescriptor* imguiRenderPassDescriptor;
-    MTL::Texture* msaaRenderTarget = nullptr;
-    MTL::Texture* depthRenderTarget = nullptr;
     
+    //
+    // lighting pass (final step of deferred shading)
+    //
     MTL::RenderPipelineState* lightingRenderPipeline;
     MTL::RenderPassDescriptor* lightingRenderPassDescriptor;
+    MTL::Texture* msaaRenderTarget = nullptr;
     
-    //MTL::RenderPipelineState* shadowPassPipeline;
-    //MTL::RenderPassDescriptor* shadowRenderPassDescriptor;
-    MTL::DepthStencilState* shadowDepthStencilState;
-    
+    //
     // lines
+    //
     MTL::RenderPipelineState* linePassPipeline;
     MTL::RenderPassDescriptor* linePassDescriptor;
     MTL::DepthStencilState* lineDepthStencilState;
@@ -261,43 +245,31 @@ private:
     MTL::Buffer* lineTransformsBuffer = nullptr;
     MTL::Buffer* lineSquareVB = nullptr;
     MTL::Buffer* lineSquareIB = nullptr;
-    
     std::vector<LineVertexData> lineVertexData;
     std::vector<float4x4> lineTransforms;
-    
     std::vector<LineData> lines;
     std::vector<LineData> visibleLines;
     int lineDataUBSize;
-    
-    int numCollisions = 0;
-    
     bool linesDirty;
     int curLineIndex;
-    
     MTL::Buffer* lineDataUB;
     
-    int curLineTransformIndex;
-    
-    
-    // G-buffer render targets
-    MTL::Texture* gPositionRT = nullptr;
-    MTL::Texture* gNormalRT = nullptr;
-    MTL::Texture* gAlbedoSpecRT = nullptr;
-    MTL::Texture* gEmissionRT = nullptr;
-    
+    //
     // cascading shadow maps
+    // 
     std::vector<MTL::Texture*> shadowMapRTs;
     std::vector<MTL::RenderPassDescriptor*> shadowMapRPDescriptors;
     std::vector<Camera> shadowMapCameras;
     std::vector<MTL::Buffer*> shadowCameraUBs;
     MTL::Texture* shadowMapColorRT = nullptr;
-    
     MTL::RenderPipelineState* voxelShadowMapRPS;
     MTL::RenderPipelineState* skeletalMeshShadowMapRPS;
-    
     int sampleCount = 4;
+    MTL::DepthStencilState* shadowDepthStencilState;
     
+    //
     // ssao
+    // 
     MTL::Buffer* ssaoKernelUB;
     MTL::Texture* ssaoNoiseTex;
     MTL::Texture* ssaoRT;
@@ -307,25 +279,30 @@ private:
     MTL::RenderPassDescriptor* ssaoRenderPassDescriptor;
     MTL::RenderPassDescriptor* ssaoBlurRenderPassDescriptor;
     
+    //
     // skybox
+    //
     MTL::Texture* skyboxTex;
     MTL::Buffer* skyboxCubeVB;
     MTL::RenderPipelineState* skyboxRPS;
     MTL::RenderPassDescriptor* skyboxRPD;
     MTL::Buffer* skyboxMVPUB;
     
-    // sphere light pipeline
+    //
+    // sphere volume pipeline (render instanced spheres for each point-light)
+    //
     MTL::RenderPipelineState* lightVolumeRPS;
     MTL::RenderPassDescriptor* lightVolumeRPD;
     MTL::Buffer* lightVolumeInstanceUB;
     int numLights;
     
-    void addPointLight(float3 posWS, float3 color);
     std::vector<LightVolumeData> pointLights;
     std::mutex pointLightArrMutex;
     int curPointLightIndex;
     
+    //
     // bloom - gaussian blur pipeline
+    //
     MTL::RenderPipelineState* gaussianBlurRPSHorizontal;
     MTL::RenderPipelineState* gaussianBlurRPSVertical;
     MTL::RenderPassDescriptor* gaussianBlurRPD0;
@@ -334,118 +311,83 @@ private:
     MTL::Texture* gaussianBlurRT0;
     MTL::Texture* gaussianBlurRT1;
     
+    //
     // combine pipeline
+    //
     MTL::RenderPipelineState* postProcessRPS;
     MTL::RenderPassDescriptor* postProcessRPD;
     MTL::Texture* lightPassRT;
     
+    //
     // mesh render pipeline (renders to g-buffer)
+    // 
+    MTL::Texture* gPositionRT = nullptr;
+    MTL::Texture* gNormalRT = nullptr;
+    MTL::Texture* gAlbedoSpecRT = nullptr;
+    MTL::Texture* gEmissionRT = nullptr;
+    MTL::Texture* depthRenderTarget = nullptr;
+    // meshes
     MTL::RenderPipelineState* meshRPS;
     MTL::RenderPassDescriptor* meshRPD;
+    // voxel geometry
+    MTL::RenderPassDescriptor* renderPassDescriptor;
+    MTL::DepthStencilState* depthStencilState;
+    MTL::RenderPipelineState* metalRenderPSO;
     
-    // line pipeline
-    
-    // player mesh
-    MTL::Buffer* playerMeshVB;
-    MTL::Buffer* playerMeshIB;
-    Texture* playerMeshTexture;
-    MTL::Buffer* playerMeshTransformationUB;
-    
-    std::vector<float4x4> animTransformations;
-    MTL::Buffer* animTransformationsUB;
-    
-    
-    // skeletal animation
 
-    void guiNodeHierarchy(AssimpNode root, bool shouldPop);
-
-    // end skeletal animation
-    
     // only needed in import step - ultimately loaded into buffer and doesn't change (since mesh is static)
-    AssimpNodeManager playerNodeManager;
-    std::vector<SkeletalMeshVertexData> playerMeshVertices;
-    std::vector<uint32_t> playerMeshIndices;
-    std::vector<float4x4> playerMeshTransformations;
-    
-    Animator animator;
-    bool controlPlayer = false; // tmp
-    MTL::Buffer* playerObjectUB;
-    float4x4 playerModelMat;
-     
     Player* player;
     
+    //
+    // physics
+    //
     simd::float3 collisionPushBackVel;
     
-    // TODO: can abstact to mesh
+    //
+    // shape buffers (TODO: can abstract to Mesh)
+    //
     MTL::Buffer* sphereVB;
     MTL::Buffer* sphereIB;
     int numSphereIndices;
+    MTL::Buffer* cubeVB;
+    MTL::Buffer* triangleVertexBuffer;
+    MTL::Buffer* squareVertexBuffer;
     
     
-    float3 ws0;
-    float3 ws1;
-    float3 ws2;
-    float3 ws3;
-    float3 ws4;
-    float3 ws5;
-    float3 ws6;
-    float3 ws7;
-    
-    bool isKeyDown(const EKey k) const { return keydownArr[k]; }
-    
-    
+    // 
+    // input
+    //
     std::array<bool, 104> keydownArr;
-    
     bool isInitialMousePos = true;
     float2 curMousePos;
     float2 prevMousePos;
     bool captureMouse = true;
+    bool spaceWasDown;
     
+    //
+    // camera
+    //
     Camera camera;
     Camera debugCamera;
     Camera shadowMapCamera;
-    
     EPlayerCameraType activeCameraType;
+    MTL::Buffer* cameraUB;
     
-    // Chunk chunk;
-    
-    // all loaded chunks
-    std::map<Int3D, Chunk> loadedChunks;
-    std::map<Int3D, std::shared_ptr<ChunkRenderer>> chunkRenderers;
-    std::vector<Int3D> sortedVisibleChunks;
-    
-    bool visibleChunksDirty;
-    MTL::Buffer* visibleChunkBuffer;
-    int numVisibleChunkVertices;
-    Int3D curChunk;
-    
-    std::vector<Chunk> chunks;
-    
-    // thread to check which chunks, say set C, need perlin generators
-    //  - will then add all chunks in C to the terrain generation queue
-    std::thread perlinGenThread;
-    
-    // group of threads to work on ChunkGen jobs
-    std::vector<std::thread> chunkGenThreads;
-    
-    std::vector<std::thread> meshGenThreads;
-    
-    std::map<Int3D, PerlinNoiseGenerator> generators;
-    
-    
-    bool chunkGenPending;
-    
-    bool spaceWasDown;
-    bool showShadowMap;
-    int debugState;
-    
-    int avgFPS;
+    // 
     
     MTL::Buffer* renderStateUB;
     
+    //
+    // configuration / profiling
+    //
     bool enableSSAO;
     bool enableShadowMap;
+    int avgFPS;
+    int numCollisions = 0;
 
+    //
+    // voxel creation/selection/removal
+    // 
     DebugBox* playerVoxelSelectIndicator;
     int playerVoxelSelectionLineId;
     DebugRect* playerVoxelSelectedRect;
@@ -466,10 +408,32 @@ private:
     
     std::vector<DebugRect*> debugRects;
     
+    //
+    // chunk/mesh generation
+    // 
+    std::vector<std::thread> chunkGenThreads;
+    std::vector<std::thread> meshGenThreads;
+    // thread to check which chunks, say set C, need perlin generators
+    //  - will then add all chunks in C to the terrain generation queue
+    std::thread perlinGenThread;
+    std::map<Int3D, PerlinNoiseGenerator> generators;
     moodycamel::ConcurrentQueue<Int3D> chunksToGenerate;
     moodycamel::ConcurrentQueue<Int3D> chunksToMesh;
     moodycamel::ProducerToken chunksToMeshPTok;
     std::mutex chunksToMeshPTokMutex;
     std::mutex loadedChunksMutex;
     std::mutex cachedChunkRDMutex;
+    bool chunkGenPending;
+
+    // all loaded chunks
+    std::map<Int3D, Chunk> loadedChunks;
+    std::map<Int3D, std::shared_ptr<ChunkRenderer>> chunkRenderers;
+    std::vector<Int3D> sortedVisibleChunks;
+    
+    bool visibleChunksDirty;
+    MTL::Buffer* visibleChunkBuffer;
+    int numVisibleChunkVertices;
+    Int3D curChunk;
+    
+    std::vector<Chunk> chunks;
 };

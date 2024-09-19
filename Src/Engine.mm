@@ -56,7 +56,6 @@ void MTLEngine::init() {
     // Setup style
     ImGui::StyleColorsDark();
 
-    curLineTransformIndex = 1;
     curLineIndex = 0;
     
     visibleChunkBuffer = nullptr;
@@ -64,8 +63,6 @@ void MTLEngine::init() {
     curChunk = Int3D(0,0,0);
     
     spaceWasDown = false;
-    showShadowMap = false;
-    debugState = 0;
     
     keydownArr.fill(false);
     
@@ -76,7 +73,6 @@ void MTLEngine::init() {
     initWindow();
     
     initCameras();
-    //initPlayerMesh();
     
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(glfwWindow, true);
@@ -2038,239 +2034,6 @@ void MTLEngine::initLinePass() {
     lineDataUB = metalDevice->newBuffer(lineDataUBSize * sizeof(LineData), MTL::ResourceStorageModeShared);
 }
 
-void MTLEngine::initPlayerMesh() {
-    playerNodeManager = AssimpNodeManager("assets/Meshes/Steve/Steve.fbx");
-    animator = Animator(&playerNodeManager);
-    
-    const std::vector<MeshUnit>& meshUnits = playerNodeManager.getMeshUnits();
-    const std::vector<AssimpNode>& nodes = playerNodeManager.getNodes();
-    const std::vector<Bone>& bones = playerNodeManager.getBones();
-    
-    for(const auto& mu : meshUnits) {
-        assert(mu.positions.size() == mu.normals.size());
-        assert(mu.positions.size() == mu.uvs.size());
-        
-        for(int i = 0; i < (int) mu.positions.size(); i++) {
-            SkeletalMeshVertexData v;
-            v.position = mu.positions[i];
-            v.normal = mu.normals[i];
-            v.uv = mu.uvs[i];
-            v.transformationIndex = mu.node;
-            v.debugColor = make_float3(0);
-            int boneWeightsAdded = 0;
-            
-            // vidToBoneWeights is local wrt the MeshUnit
-            if(mu.vidToBoneWeights.contains(i)) {
-                auto boneWeights = mu.vidToBoneWeights.at(i);
-                for(; boneWeightsAdded < (int) boneWeights.size(); boneWeightsAdded++) {
-                    if(boneWeightsAdded >= 4) { // max bone weights per vertex // todo: should be a const... or actually shader defines this
-                        break;
-                    }
-                    
-                    const int bwIndex = boneWeightsAdded;
-                    v.boneWeights[bwIndex].weight = boneWeights[bwIndex].weight;
-                    v.boneWeights[bwIndex].boneIndex = boneWeights[bwIndex].boneId;
-                    
-                    int bid = boneWeights[bwIndex].boneId;
-                    float w = boneWeights[bwIndex].weight;
-                    
-                    if(bid == playerNodeManager.getBoneId("Bone.014")) {
-                        v.debugColor += make_float3(0, w, 0); // top leg
-                    }
-                    
-                    if(bid == playerNodeManager.getBoneId("Bone.015")) {
-                        v.debugColor += make_float3(w, 0, 0); // top leg
-                    }
-                    
-                    if(bid == playerNodeManager.getBoneId("Bone.016")) {
-                        v.debugColor += make_float3(0, 0, w); // bottom leg
-                    }
-                    
-                    assert(v.boneWeights[bwIndex].boneIndex < bones.size());
-                }
-            }
-            
-            // initialize weight to zero for the slots not needed
-            for(; boneWeightsAdded < 4; boneWeightsAdded++) {
-                v.boneWeights[boneWeightsAdded].weight = 0.0f;
-                v.boneWeights[boneWeightsAdded].boneIndex = 0;
-            }
-            
-            playerMeshVertices.push_back(v);
-        }
-        
-        
-        std::cout << nodes[mu.node].name << " using transformation: " << mu.node << std::endl;
-        
-    }
-    
-    playerMeshIndices = playerNodeManager.createSingleBufferIndices();
-    playerMeshTransformations = playerNodeManager.createNodeModelTransforms();
-    
-    animTransformations.resize(bones.size());
-    
-    for(int i = 0; i < nodes.size(); i++) {
-        auto node = nodes[i];
-        float4x4 mt = playerNodeManager.calculateModelTransform(i);
-        
-        int boneId = playerNodeManager.getBoneId(node.name);
-        
-        if(boneId >= 0) {
-            animTransformations[boneId] = mt * bones[boneId].offsetMat; // float4x4(1); // mt * bones[boneId].offsetMat;
-        }
-    }
-    
-    /*
-    playerMeshVertices.clear();
-    playerMeshIndices.clear();
-    processAssimpAnimations(scene->mRootNode, scene);
-    processAssimpNode(scene->mRootNode, scene);
-    
-    */
-    
-    
-    // load mesh data into buffers
-    playerMeshVB = metalDevice->newBuffer(playerMeshVertices.data(), playerMeshVertices.size() * sizeof(SkeletalMeshVertexData), MTL::ResourceStorageModeShared);
-    playerMeshIB = metalDevice->newBuffer(playerMeshIndices.data(), playerMeshIndices.size() * sizeof(uint32_t), MTL::ResourceStorageModeShared);
-    playerMeshTexture = new Texture("assets/Meshes/Steve/diffuse.png", metalDevice, STBI_rgb);
-    playerMeshTransformationUB = metalDevice->newBuffer(playerMeshTransformations.data(), playerMeshTransformations.size() * sizeof(float4x4), MTL::ResourceStorageModeShared);
-    
-    animTransformationsUB = metalDevice->newBuffer(animTransformations.data(), animTransformations.size() * sizeof(float4x4), MTL::ResourceStorageModeShared);
-    
-    ObjectData od { matrix4x4_identity() };
-    playerModelMat = matrix4x4_identity();
-    playerObjectUB = metalDevice->newBuffer(&od, sizeof(od), MTL::ResourceStorageModeShared);
-}
-
-void MTLEngine::processAssimpAnimations(const aiNode* node, const aiScene* scene) {
-    if(!scene->HasAnimations()) {
-        return;
-    }
-    
-    /*
-    for(int i = 0; i < scene->mNumAnimations; i++) {
-        auto anim = scene->mAnimations[i];
-        
-        
-        for(int j = 0; j < anim->mNumChannels; j++) {
-            const auto ch = anim->mChannels[j];
-            
-        }
-    }
-    */
-    
-}
-
-void MTLEngine::processAssimpNode(const aiNode* node, const aiScene* scene) {
-    
-    if(node->mNumMeshes > 0) {
-        // process all the node's meshes (if any)
-        aiMatrix4x4 nt = node->mTransformation;
-        
-        float unitScale = 0.6f;
-        float3 translate { nt.a4, nt.b4, nt.c4 };
-        translate *= unitScale;
-        float3 scale(unitScale);
-        
-        float4x4 localModel = matrix4x4_translation(translate) * matrix4x4_scale(scale);
-        
-        /*
-        float4x4 localModel = (matrix_float4x4) { {
-            {nt.a1, nt.a2, nt.a3, nt.a4},
-            {nt.b1, nt.b2, nt.b3, nt.b4},
-            {nt.c1, nt.c2, nt.c3, nt.c4},
-            {nt.d1, nt.d2, nt.d3, nt.d4}
-        } };
-        */
-        // NOTE:
-        /*
-        float4x4 localModel = (matrix_float4x4) { {
-            {nt.a1, nt.b1, nt.c1, nt.d1},
-            {nt.a2, nt.b2, nt.c2, nt.d2},
-            {nt.a3, nt.b3, nt.c3, nt.d3},
-            {nt.a4, nt.b4, nt.c4, nt.d4}
-        } };
-        */
-        
-        playerMeshTransformations.push_back(localModel);
-    }
-    
-    for(unsigned int i = 0; i < node->mNumMeshes; i++)
-    {
-        aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-        
-        processAssimpMesh(mesh, scene);
-    }
-    
-    //std::cout << "Finished." << std::endl;
-    
-    // then do the same for each of its children
-    for(unsigned int i = 0; i < node->mNumChildren; i++)
-    {
-        processAssimpNode(node->mChildren[i], scene);
-    }
-}
-
-void MTLEngine::processAssimpMesh(const aiMesh* mesh, const aiScene* scene) {
-    /*
-    std::cout << fmt::format("Processing mesh: {} nVerts: {} nFaces: {} transform: {}",
-                             mesh->mName.C_Str(), mesh->mNumVertices, mesh->mNumFaces,
-                             playerMeshTransformations.size() - 1) << std::endl;
-    
-    
-    for(unsigned int i =0;i < mesh->mNumBones; i++) {
-        auto b = mesh->mBones[i];
-        std::cout << fmt::format("Bone: {} {}", std::string(b->mName.C_Str()), b->mNumWeights) << std::endl;
-        std::cout << fmt::format("{} {} {}", b->mOffsetMatrix.a1, b->mOffsetMatrix.a2, b->mOffsetMatrix.a3) << std::endl;
-    }
-    */
-    
-    int indexOffset = (int) playerMeshVertices.size();
-    std::cout << "og indexoffset: " << indexOffset << std::endl;
-    
-    for(unsigned int i = 0; i < mesh->mNumVertices; i++)
-    {
-        MeshVertexData vd;
-        
-        float4 pos {
-            mesh->mVertices[i].x,
-            mesh->mVertices[i].z,
-            mesh->mVertices[i].y,
-            1.0f
-        };
-        
-        float3 norm {
-            mesh->mNormals[i].x,
-            mesh->mNormals[i].z,
-            mesh->mNormals[i].y
-        };
-        
-        float2 uv {
-            mesh->mTextureCoords[0][i].x,
-            mesh->mTextureCoords[0][i].y
-        };
-        
-        int transformationIndex = (int) playerMeshTransformations.size() - 1;
-        
-        vd.position = pos;
-        vd.normal = norm;
-        vd.uv = uv;
-        vd.transformationIndex = transformationIndex;
-        
-        // playerMeshVertices.push_back(vd);
-    }
-    
-    for(unsigned int i = 0; i < mesh->mNumFaces; i++)
-    {
-        aiFace face = mesh->mFaces[i];
-        for(unsigned int j = 0; j < face.mNumIndices; j++) {
-           // playerMeshIndices.push_back(face.mIndices[j + 2]);
-            //playerMeshIndices.push_back(face.mIndices[j + 1]);
-            playerMeshIndices.push_back(indexOffset + face.mIndices[j]);
-        }
-    }
-}
-
 void MTLEngine::createBuffers() {
     //transformationUB = metalDevice->newBuffer(sizeof(TransformationData), MTL::ResourceStorageModeShared);
     
@@ -2298,40 +2061,11 @@ void MTLEngine::createBuffers() {
     
     lineTransforms.resize(maxLines, matrix4x4_identity());
     lineVertexData.resize(6 * maxLines);
-    
-    // add lines for outlining the main camera's frustum
-    // we will modify these lines every frame using their index (which is base-1)
-    //
-    // there are 12 lines, where the order is
-    //
-    // 1: near-box L
-    // 2: near-box U
-    // 3: near-box R
-    // 4: near-box D
-    // 5: far-box L
-    // 6: far-box U
-    // 7: far-box R
-    // 8: far-box D
-    // 9: near-to-far TL
-    // 10: near-to-far TR
-    // 11: near-to-far BR
-    // 12: near-to-far BL
-    
-    for(int i = 0; i < maxLines - 1; i++) {
-        float3 color = i < 12? make_float3(1,1,0) : make_float3(0,0,1);
-        if(i >= 24) {
-            color = make_float3(1,0,0);
-        }
-        if(i >= 31) {
-            color = make_float3(0,1,0);
-        }
-        // addLine(make_float3(0,0,0), make_float3(1,0,0), 0.25f, color);
-    }
-    
 }
 
 void MTLEngine::createDefaultLibrary() {
-    // metalDefaultLibrary = metalDevice->newDefaultLibrary();
+    // load pre-compiled metal shaders
+    // (should already be done from the build process)
     NS::String* libraryPath = NS::String::string("JAMC.metallib", NS::StringEncoding::UTF8StringEncoding);
 
     NS::Error* error;
@@ -3182,7 +2916,10 @@ void MTLEngine::drawChunkGeometry(MTL::RenderCommandEncoder* renderCommandEncode
     }
 }
 
-void MTLEngine::cameraTick(const float deltaTime, Camera& outCamera, const CameraMovementKeyMap keyMap) {
+void MTLEngine::freeFloatingCameraTick(const float deltaTime, Camera& outCamera, const CameraMovementKeyMap keyMap) {
+    // logic for a free-floating camera
+    // will be used for a debugging camera
+    
     float3 moveDir = make_float3(0,0,0);
     const float3& forward = outCamera.getForwardVector();
     const float3& right = outCamera.getRightVector();
@@ -3268,47 +3005,6 @@ void MTLEngine::tickPlayerCameraFirstPerson(const float deltaTime, Camera& outCa
 }
 
 void MTLEngine::keyTick(const float deltaTime) {
-    /*
-    bool playerIsMoving = false;
-    if(controlPlayer) {
-        if(isKeyDown(EKey::W)) {
-            playerIsMoving = true;
-            playerModelMat = matrix4x4_translation(5 * deltaTime, 0, 0) * playerModelMat;
-        }
-        else if(isKeyDown(EKey::S)) {
-            playerIsMoving = true;
-            playerModelMat = matrix4x4_translation(-5 * deltaTime, 0, 0) * playerModelMat;
-        }
-    }
-    else {
-        
-        CameraMovementKeyMap mainCamKeyMap;
-        mainCamKeyMap.left = EKey::A;
-        mainCamKeyMap.right = EKey::D;
-        mainCamKeyMap.forward = EKey::W;
-        mainCamKeyMap.back = EKey::S;
-        mainCamKeyMap.up = EKey::E;
-        mainCamKeyMap.down = EKey::Q;
-        mainCamKeyMap.turnUp = EKey::Up;
-        mainCamKeyMap.turnDown = EKey::Down;
-        mainCamKeyMap.turnLeft = EKey::Left;
-        mainCamKeyMap.turnRight = EKey::Right;
-        
-        cameraTick(deltaTime, camera, mainCamKeyMap);
-    }
-    
-    if(playerIsMoving) {
-        animator.play("Armature|Walk");
-    }
-    else {
-        animator.pause();
-    }
-    
-    ObjectData od;
-    od.model = playerModelMat;
-    memcpy(playerObjectUB->contents(), &od, sizeof(od));
-    */
-    
     {
         CameraMovementKeyMap keyMap;
         keyMap.left = EKey::J;
@@ -3323,23 +3019,12 @@ void MTLEngine::keyTick(const float deltaTime) {
         keyMap.turnLeft = EKey::N;
         keyMap.turnRight = EKey::M;
         
-        cameraTick(deltaTime, debugCamera, keyMap);
+        freeFloatingCameraTick(deltaTime, debugCamera, keyMap);
     }
     
     if(isKeyDown(EKey::Space)) {
         spaceWasDown = true;
     }
-    
-    /*
-    if(spaceWasDown && !isKeyDown(EKey::Space)) {
-        controlPlayer = !controlPlayer;
-        
-        debugState = (debugState + 1) % 6;
-        
-        debugCamera.setPosition(camera.getPosition());
-        debugCamera.setPitchYaw(camera.getPitch(), camera.getYaw());
-    }
-    */
     
     if(!isKeyDown(EKey::Space)) {
         spaceWasDown = false;
@@ -4023,59 +3708,4 @@ void MTLEngine::addPointLight(float3 posWS, float3 color) {
     pointLights[index] = newLight;
 
     memcpy(lightVolumeInstanceUB->contents(), pointLights.data(), pointLights.size() * sizeof(LightVolumeData));
-}
-
-
-
-void MTLEngine::guiNodeHierarchy(AssimpNode root, bool shouldPop) {
-    const auto nodes = playerNodeManager.getNodes();
-    const auto bones = playerNodeManager.getBones();
-    
-    bool hasChildren = root.children.size() > 0;
-    
-    if(hasChildren) {
-        ImGui::TreePush(root.name.c_str());
-    }
-    
-    ImGui::Text("%s [%d] (%s)", root.name.c_str(), root.id, root.parent == -1? "root" : nodes[root.parent].name.c_str());
-    int bid = playerNodeManager.getBoneId(root.name);
-    if(bid != -1) {
-        ImGui::Text("Bone %d", bid);
-    }
-    
-    bool isAnimated = animator.nodesBeingAnimated.contains(root.id);
-    if(isAnimated) {
-        ImGui::Text("Animated!");
-    }
-    
-    {
-        const auto m = root.relativeTransform.columns;
-        ImGui::Text("(%f,%f,%f,%f)\n(%f,%f,%f,%f)\n(%f,%f,%f,%f)\n(%f,%f,%f,%f)\n ",
-                         m[0][0], m[0][1], m[0][2], m[0][3],
-                        m[1][0], m[1][1], m[1][2], m[1][3],
-                        m[2][0], m[2][1], m[2][2], m[2][3],
-                        m[3][0], m[3][1], m[3][2], m[3][3]);
-    }
-    
-    /*
-    int bid = playerNodeManager.getBoneId(root.name);
-    if(bid != -1) {
-        const auto m = inverse(bones[bid].offsetMat).columns;
-        ImGui::Text("\n(%f,%f,%f,%f)\n(%f,%f,%f,%f)\n(%f,%f,%f,%f)\n(%f,%f,%f,%f)\n ",
-                         m[0][0], m[0][1], m[0][2], m[0][3],
-                        m[1][0], m[1][1], m[1][2], m[1][3],
-                        m[2][0], m[2][1], m[2][2], m[2][3],
-                        m[3][0], m[3][1], m[3][2], m[3][3]);
-    }
-    */
-    
-    for(int i = 0 ; i < root.children.size(); i++) {
-        bool childShouldPop = i == root.children.size() - 1;
-        int cid = root.children[i];
-        guiNodeHierarchy(nodes[cid], childShouldPop);
-    }
-    
-    if(shouldPop) {
-        ImGui::TreePop();
-    }
 }
